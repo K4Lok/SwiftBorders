@@ -6,7 +6,9 @@ Built for macOS 26 (Tahoe) and designed to play well with tiling window managers
 
 ## Why
 
-JankyBorders is great but relies on the private `SkyLight` framework, so it tends to break on macOS upgrades. SwiftBorders deliberately uses the **public Accessibility API** + transparent overlay windows. The trade-off: a touch more latency on fast window drags, in exchange for not breaking every OS update.
+JankyBorders is great but relies on the private `SkyLight` framework, so it tends to break on macOS upgrades. SwiftBorders uses the **public Accessibility API** + transparent overlay windows for everything load-bearing (focus tracking, geometry, drawing). The trade-off: a touch more latency on fast window drags, in exchange for not breaking every OS update.
+
+The one exception is reading a window's exact corner radius — the public API doesn't expose it, so (like JankyBorders) we ask `SkyLight` via a private call. It's resolved with `dlsym` and fully guarded: if that symbol ever disappears on a future macOS, the border falls back to a configured radius and the app keeps working — it just loses pixel-perfect corners.
 
 ## Features
 
@@ -15,7 +17,8 @@ JankyBorders is great but relies on the private `SkyLight` framework, so it tend
 - Multi-monitor aware (one overlay per display — correct behavior with "Displays have separate Spaces")
 - Live-reloading JSON config — edit and see changes instantly
 - Menu-bar settings GUI (color wells + sliders)
-- Style options: width, per-window-type corner radius, opacity, dashed, glow, outward bias
+- Pixel-accurate corners: exact per-window radius read from the WindowServer, drawn as a continuous (squircle) curve to match macOS
+- Style options: width, corner smoothing, opacity, dashed, glow, outward bias
 - Launch at login
 
 ## Requirements
@@ -42,8 +45,9 @@ Settings live at `~/Library/Application Support/SwiftBorder/config.json` and rel
 | Key | Meaning |
 |---|---|
 | `width` | Border thickness (pt) |
-| `cornerRadius` | Radius for windows **with** a toolbar |
-| `plainCornerRadius` | Radius for windows **without** a toolbar (Terminal, utilities) |
+| `cornerRadius` | Fallback radius for toolbar windows (only used if the WindowServer lookup is unavailable) |
+| `plainCornerRadius` | Fallback radius for plain windows (only used if the WindowServer lookup is unavailable) |
+| `cornerSmoothing` | Continuous-corner smoothing 0–1 (0 = circular, ~1.0 = macOS Tahoe) |
 | `activeColor` | Focused-window border color |
 | `drawInactive` / `inactiveColor` | Borders on non-focused windows |
 | `opacity` | Border opacity (0–1) |
@@ -54,7 +58,7 @@ Settings live at `~/Library/Application Support/SwiftBorder/config.json` and rel
 
 ## Known limitations
 
-- macOS Tahoe gives windows non-uniform corner radii and the exact value isn't exposed by the public API, so corners are matched heuristically (toolbar vs plain) rather than pixel-perfectly. Fullscreen windows are squared automatically.
+- The exact corner radius comes from a guarded private `SkyLight` call. For native windows this is pixel-perfect; some custom-drawn apps (e.g. Telegram) render a slightly larger *visible* corner than the OS reports, so the border can sit a few points tight on those — the same limitation JankyBorders has. Fullscreen windows are squared automatically.
 - Borders track focus with a few frames of latency on fast drags (inherent to the Accessibility API).
 
 ## Debugging

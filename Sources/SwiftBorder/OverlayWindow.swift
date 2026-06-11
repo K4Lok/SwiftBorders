@@ -2,6 +2,13 @@ import Cocoa
 
 // A transparent, click-through window that draws one rounded-rect border.
 // Reused for both the active window and each inactive window.
+//
+// The border is a *stroked path* (CAShapeLayer), not a CALayer border: a stroke
+// has uniform width everywhere, including the corners. A CALayer `borderWidth`
+// with a corner radius pinches at the corners (its inner/outer corner curves
+// aren't parallel offsets), so the corner reads thinner than the straight edges.
+// The exact corner radius comes from the WindowServer (see WindowRadius), so a
+// circular rounded rect matches the window — same approach as JankyBorders.
 final class OverlayWindow: NSWindow {
     private let borderLayer = CAShapeLayer()
 
@@ -22,6 +29,7 @@ final class OverlayWindow: NSWindow {
 
         let view = NSView(frame: .zero)
         view.wantsLayer = true
+        view.layer?.masksToBounds = false
         view.layer?.addSublayer(borderLayer)
         contentView = view
     }
@@ -43,15 +51,21 @@ final class OverlayWindow: NSWindow {
         let windowRect = CGRect(x: totalPad, y: totalPad, width: frame.width, height: frame.height)
         let strokeRect = windowRect.insetBy(dx: -pad, dy: -pad)
         let radius = CGFloat(config.cornerRadius) + pad
-        let path = CGPath(roundedRect: strokeRect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        let path = SquirclePath.path(in: strokeRect, cornerRadius: radius, smoothing: CGFloat(config.cornerSmoothing))
 
         let stroke = color.withAlphaComponent(color.alphaComponent * CGFloat(config.opacity))
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        // A manually-added sublayer doesn't inherit the window's backing scale, so
+        // without this it rasterizes at 1x and the upscaled curves blur. Match the
+        // display so the stroke is crisp.
+        borderLayer.contentsScale = backingScaleFactor
         borderLayer.frame = bounds
         borderLayer.path = path
         borderLayer.lineWidth = width
+        borderLayer.lineJoin = .round
+        borderLayer.lineCap = .round
         borderLayer.fillColor = NSColor.clear.cgColor
         borderLayer.strokeColor = stroke.cgColor
         borderLayer.lineDashPattern = config.style == "dashed"

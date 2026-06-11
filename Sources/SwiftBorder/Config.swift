@@ -5,8 +5,9 @@ import Cocoa
 struct BorderConfig: Codable, Equatable {
     // Core look
     var width: Double = 4.0
-    var cornerRadius: Double = 12.0          // windows WITH a toolbar (Tahoe's larger corners)
-    var plainCornerRadius: Double = 8.0      // windows WITHOUT a toolbar (Terminal, utilities)
+    var cornerRadius: Double = 16.0          // fallback for windows WITH a toolbar (used only if SkyLight detection fails)
+    var plainCornerRadius: Double = 11.0     // fallback for windows WITHOUT a toolbar
+    var cornerSmoothing: Double = 1.0        // continuous-corner smoothing 0…1 (0 = circular; macOS Tahoe ≈ 1.0, much smoother than iOS's 0.6)
     var activeColor: String = "0xff8093eb"
 
     // Inactive borders
@@ -36,6 +37,7 @@ struct BorderConfig: Codable, Equatable {
         width = g(.width, d.width)
         cornerRadius = g(.cornerRadius, d.cornerRadius)
         plainCornerRadius = g(.plainCornerRadius, d.plainCornerRadius)
+        cornerSmoothing = g(.cornerSmoothing, d.cornerSmoothing)
         activeColor = g(.activeColor, d.activeColor)
         drawInactive = g(.drawInactive, d.drawInactive)
         inactiveColor = g(.inactiveColor, d.inactiveColor)

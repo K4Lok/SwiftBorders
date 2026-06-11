@@ -233,7 +233,11 @@ final class BorderController {
         dlog("render cocoaFrame=\(rectStr(frame)) display=\(displayID) fullscreen=\(isFullscreen(window))")
 
         var effective = config
-        if isFullscreen(window) {
+        if let detected = WindowRadius.cornerRadius(of: window) {
+            // Exact radius straight from the WindowServer (per-app correct).
+            effective.cornerRadius = detected
+            dlog("radius detected=\(detected) (skylight)")
+        } else if isFullscreen(window) {
             effective.cornerRadius = 0           // fullscreen windows are square
         } else if !trackedHasToolbar {
             effective.cornerRadius = config.plainCornerRadius
