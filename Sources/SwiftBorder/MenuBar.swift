@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import QuartzCore
 
 // Observable mirror of BorderConfig for SwiftUI bindings. Any edit commits the
 // whole config back through `onCommit`. `load(_:)` updates the controls from an
@@ -19,6 +20,12 @@ final class SettingsModel: ObservableObject {
     @Published var glow: Bool { didSet { commit() } }
     @Published var glowRadius: Double { didSet { commit() } }
     @Published var outwardBias: Double { didSet { commit() } }
+    @Published var animation: String { didSet { commit() } }
+    @Published var animationDuration: Double { didSet { commit() } }
+    @Published var beamPalette: String { didSet { commit() } }
+    @Published var beamColor: Color { didSet { commit() } }
+    @Published var beamSize: Double { didSet { commit() } }
+    @Published var animateAll: Bool { didSet { commit() } }
     @Published var launchAtLogin: Bool { didSet { commit() } }
 
     // Usable height of the screen the menu-bar icon lives on. Set by the
@@ -44,6 +51,12 @@ final class SettingsModel: ObservableObject {
         glow = config.glow
         glowRadius = config.glowRadius
         outwardBias = config.outwardBias
+        animation = config.animation
+        animationDuration = config.animationDuration
+        beamPalette = config.beamPalette
+        beamColor = Color(nsColor: .fromHex(config.beamColor))
+        beamSize = config.beamSize
+        animateAll = config.animateAll
         launchAtLogin = config.launchAtLogin
     }
 
@@ -63,6 +76,12 @@ final class SettingsModel: ObservableObject {
         glow = config.glow
         glowRadius = config.glowRadius
         outwardBias = config.outwardBias
+        animation = config.animation
+        animationDuration = config.animationDuration
+        beamPalette = config.beamPalette
+        beamColor = Color(nsColor: .fromHex(config.beamColor))
+        beamSize = config.beamSize
+        animateAll = config.animateAll
         launchAtLogin = config.launchAtLogin
         isLoading = false
     }
@@ -88,6 +107,12 @@ final class SettingsModel: ObservableObject {
         c.glow = glow
         c.glowRadius = glowRadius
         c.outwardBias = outwardBias
+        c.animation = animation
+        c.animationDuration = animationDuration
+        c.beamPalette = beamPalette
+        c.beamColor = NSColor(beamColor).hexString
+        c.beamSize = beamSize
+        c.animateAll = animateAll
         c.launchAtLogin = launchAtLogin
         return c
     }
@@ -103,34 +128,97 @@ private struct SquircleBorderShape: Shape {
     }
 }
 
-// Live, faithful mini-window showing the current border style.
+// Live, faithful mini-window showing the current border style. Animated styles
+// are driven by a TimelineView clock so the preview moves like the real overlay.
 private struct PreviewSwatch: View {
     @ObservedObject var model: SettingsModel
 
+    private var paletteColors: [Color] {
+        let accent = NSColor(model.beamColor)
+        return BeamPalette.colors(model.beamPalette, accent: accent).map { Color(nsColor: $0) }
+    }
+
+    // Conic "beam": base ring everywhere, brightening through the palette across
+    // a wedge of `beamSize`, centered at the top.
+    private var beamGradient: Gradient {
+        let base = model.activeColor.opacity(model.opacity)
+        let span = min(max(model.beamSize, 0.05), 0.9)
+        let start = 0.5 - span / 2, end = 0.5 + span / 2
+        var stops: [Gradient.Stop] = [.init(color: base, location: 0), .init(color: base, location: start)]
+        let pal = paletteColors
+        for (i, c) in pal.enumerated() {
+            let t = pal.count == 1 ? 0.5 : Double(i) / Double(pal.count - 1)
+            stops.append(.init(color: c, location: start + t * span))
+        }
+        stops.append(.init(color: base, location: end))
+        stops.append(.init(color: base, location: 1))
+        return Gradient(stops: stops)
+    }
+
+    private var ringGradient: Gradient {
+        let wheel = paletteColors.count >= 2 ? paletteColors : [model.activeColor, Color(nsColor: NSColor(model.beamColor))]
+        return Gradient(colors: wheel + [wheel[0]])
+    }
+
     var body: some View {
-        // Leave room for half the stroke + the glow so neither gets clipped.
         let inset = max(model.width / 2 + (model.glow ? model.glowRadius : 0) + 4, 8)
         let shape = SquircleBorderShape(cornerRadius: model.cornerRadius,
                                         smoothing: model.cornerSmoothing)
-        let stroke = model.activeColor.opacity(model.opacity)
 
         ZStack {
             shape
                 .fill(Color(nsColor: .windowBackgroundColor))
                 .padding(inset)
-            shape
-                .stroke(stroke, style: StrokeStyle(
-                    lineWidth: model.width, lineCap: .round, lineJoin: .round,
-                    dash: model.dashed ? [model.width * 2, model.width * 1.5] : []))
-                .shadow(color: model.glow ? stroke : .clear,
-                        radius: model.glow ? model.glowRadius : 0)
-                .padding(inset)
+            TimelineView(.animation) { _ in
+                // Same media clock the overlay animations are anchored to, so the
+                // preview and the real borders sweep in lockstep.
+                let t = CACurrentMediaTime()
+                let phase = (t / max(model.animationDuration, 0.1)).truncatingRemainder(dividingBy: 1)
+                border(shape: shape, phase: phase).padding(inset)
+            }
         }
         .frame(maxWidth: .infinity)
         .frame(height: 86)
         .background(Color(nsColor: .underPageBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .animation(.easeOut(duration: 0.12), value: model.width)
+    }
+
+    @ViewBuilder
+    private func border(shape: SquircleBorderShape, phase: Double) -> some View {
+        let base = model.activeColor.opacity(model.opacity)
+        let style = StrokeStyle(lineWidth: model.width, lineCap: .round, lineJoin: .round,
+                                dash: model.dashed && model.animation == "none"
+                                    ? [model.width * 2, model.width * 1.5] : [])
+        let glow = model.glow ? model.glowRadius : 0
+
+        switch model.animation {
+        case "conic":
+            shape.stroke(AngularGradient(gradient: beamGradient, center: .center,
+                                         angle: .degrees(-phase * 360)), style: style)
+                .shadow(color: model.glow ? base : .clear, radius: glow)
+        case "gradient":
+            shape.stroke(AngularGradient(gradient: ringGradient, center: .center),
+                         style: style)
+                .shadow(color: model.glow ? base : .clear, radius: glow)
+        case "comet":
+            let len = min(max(model.beamSize, 0.05), 0.9)
+            let beam = (paletteColors.first ?? base)
+            ZStack {
+                shape.stroke(base, style: style)
+                let head = phase, tail = phase - len
+                shape.trim(from: max(tail, 0), to: head).stroke(beam, style: style)
+                if tail < 0 { shape.trim(from: 1 + tail, to: 1).stroke(beam, style: style) }
+            }
+            .shadow(color: model.glow ? beam : .clear, radius: glow)
+        case "pulse":
+            let o = 0.3 + 0.7 * (0.5 + 0.5 * cos(phase * 2 * .pi))
+            shape.stroke(base, style: style).opacity(o)
+                .shadow(color: model.glow ? base : .clear, radius: glow)
+        default:
+            shape.stroke(base, style: style)
+                .shadow(color: model.glow ? base : .clear, radius: glow)
+        }
     }
 }
 
@@ -186,9 +274,42 @@ struct SettingsView: View {
 
                     section("Style") {
                         Toggle("Dashed", isOn: $model.dashed)
+                            .disabled(model.animation != "none")
                         Toggle("Glow", isOn: $model.glow)
                         slider("Glow radius", value: $model.glowRadius, range: 0...20, suffix: "pt")
                             .disabled(!model.glow)
+                    }
+
+                    section("Animation") {
+                        Picker("Style", selection: $model.animation) {
+                            Text("None").tag("none")
+                            Text("Conic beam").tag("conic")
+                            Text("Comet").tag("comet")
+                            Text("Pulse").tag("pulse")
+                            Text("Gradient").tag("gradient")
+                        }
+                        if ["conic", "comet", "gradient"].contains(model.animation) {
+                            Picker("Palette", selection: $model.beamPalette) {
+                                Text("Custom").tag("custom")
+                                Text("Aurora").tag("aurora")
+                                Text("Neon").tag("neon")
+                                Text("Ocean").tag("ocean")
+                                Text("Sunset").tag("sunset")
+                                Text("Mono").tag("mono")
+                            }
+                            if model.beamPalette == "custom" {
+                                ColorPicker("Beam color", selection: $model.beamColor, supportsOpacity: true)
+                            }
+                        }
+                        if ["conic", "comet"].contains(model.animation) {
+                            slider("Beam size", value: $model.beamSize, range: 0.05...0.9, suffix: "")
+                        }
+                        if ["conic", "comet", "pulse"].contains(model.animation) {
+                            slider("Duration", value: $model.animationDuration, range: 1...20, suffix: "s")
+                        }
+                        if model.animation != "none" {
+                            Toggle("Apply to all windows", isOn: $model.animateAll)
+                        }
                     }
 
                     section("System") {

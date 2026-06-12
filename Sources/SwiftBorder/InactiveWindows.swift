@@ -81,6 +81,7 @@ final class InactiveWindows {
                 effective.cornerRadius = detected
             }
             effective.opacity = config.inactiveOpacity   // inactive has its own opacity
+            if !config.animateAll { effective.animation = "none" } // animations are active-window only unless opted in
             win.update(frame: frame, config: effective, color: color)
         }
     }

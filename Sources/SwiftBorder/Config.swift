@@ -23,6 +23,14 @@ struct BorderConfig: Codable, Equatable {
     var glowRadius: Double = 6.0
     var outwardBias: Double = 0.5       // 0 = on the edge, 1 = fully outside
 
+    // Animation (border-beam-style)
+    var animation: String = "none"     // "none" | "conic" | "comet" | "pulse" | "gradient"
+    var animationDuration: Double = 6.0 // seconds per full cycle
+    var beamPalette: String = "custom"  // "custom" | "colorful" | "mono" | "ocean" | "sunset"
+    var beamColor: String = "0xffffffff" // accent/beam color when palette == "custom" (activeColor is the base)
+    var beamSize: Double = 0.18         // fraction of the perimeter the bright beam spans (0…1)
+    var animateAll: Bool = false        // animate every window's border, not just the active one
+
     // System
     var launchAtLogin: Bool = false
 
@@ -50,6 +58,12 @@ struct BorderConfig: Codable, Equatable {
         glow = g(.glow, d.glow)
         glowRadius = g(.glowRadius, d.glowRadius)
         outwardBias = g(.outwardBias, d.outwardBias)
+        animation = g(.animation, d.animation)
+        animationDuration = g(.animationDuration, d.animationDuration)
+        beamPalette = g(.beamPalette, d.beamPalette)
+        beamColor = g(.beamColor, d.beamColor)
+        beamSize = g(.beamSize, d.beamSize)
+        animateAll = g(.animateAll, d.animateAll)
         launchAtLogin = g(.launchAtLogin, d.launchAtLogin)
     }
 }
