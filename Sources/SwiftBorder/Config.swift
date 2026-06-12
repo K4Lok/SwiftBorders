@@ -13,6 +13,8 @@ struct BorderConfig: Codable, Equatable {
     // Inactive borders
     var drawInactive: Bool = false
     var inactiveColor: String = "0x80494d64"
+    var inactiveOpacity: Double = 1.0
+    var drawHiddenWindows: Bool = false      // also outline windows hidden behind others
 
     // Style extras
     var opacity: Double = 1.0
@@ -41,6 +43,8 @@ struct BorderConfig: Codable, Equatable {
         activeColor = g(.activeColor, d.activeColor)
         drawInactive = g(.drawInactive, d.drawInactive)
         inactiveColor = g(.inactiveColor, d.inactiveColor)
+        inactiveOpacity = g(.inactiveOpacity, d.inactiveOpacity)
+        drawHiddenWindows = g(.drawHiddenWindows, d.drawHiddenWindows)
         opacity = g(.opacity, d.opacity)
         style = g(.style, d.style)
         glow = g(.glow, d.glow)

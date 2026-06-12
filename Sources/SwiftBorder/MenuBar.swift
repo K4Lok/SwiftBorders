@@ -8,6 +8,8 @@ final class SettingsModel: ObservableObject {
     @Published var activeColor: Color { didSet { commit() } }
     @Published var drawInactive: Bool { didSet { commit() } }
     @Published var inactiveColor: Color { didSet { commit() } }
+    @Published var inactiveOpacity: Double { didSet { commit() } }
+    @Published var drawHiddenWindows: Bool { didSet { commit() } }
     @Published var width: Double { didSet { commit() } }
     @Published var cornerRadius: Double { didSet { commit() } }
     @Published var plainCornerRadius: Double { didSet { commit() } }
@@ -31,6 +33,8 @@ final class SettingsModel: ObservableObject {
         activeColor = Color(nsColor: .fromHex(config.activeColor))
         drawInactive = config.drawInactive
         inactiveColor = Color(nsColor: .fromHex(config.inactiveColor))
+        inactiveOpacity = config.inactiveOpacity
+        drawHiddenWindows = config.drawHiddenWindows
         width = config.width
         cornerRadius = config.cornerRadius
         plainCornerRadius = config.plainCornerRadius
@@ -48,6 +52,8 @@ final class SettingsModel: ObservableObject {
         activeColor = Color(nsColor: .fromHex(config.activeColor))
         drawInactive = config.drawInactive
         inactiveColor = Color(nsColor: .fromHex(config.inactiveColor))
+        inactiveOpacity = config.inactiveOpacity
+        drawHiddenWindows = config.drawHiddenWindows
         width = config.width
         cornerRadius = config.cornerRadius
         plainCornerRadius = config.plainCornerRadius
@@ -75,6 +81,8 @@ final class SettingsModel: ObservableObject {
         c.activeColor = NSColor(activeColor).hexString
         c.drawInactive = drawInactive
         c.inactiveColor = NSColor(inactiveColor).hexString
+        c.inactiveOpacity = inactiveOpacity
+        c.drawHiddenWindows = drawHiddenWindows
         c.opacity = opacity
         c.style = dashed ? "dashed" : "solid"
         c.glow = glow
@@ -153,11 +161,19 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    section("Color") {
-                        ColorPicker("Active", selection: $model.activeColor, supportsOpacity: true)
-                        Toggle("Border on inactive windows", isOn: $model.drawInactive)
-                        ColorPicker("Inactive", selection: $model.inactiveColor, supportsOpacity: true)
-                            .disabled(!model.drawInactive)
+                    section("Active border") {
+                        ColorPicker("Color", selection: $model.activeColor, supportsOpacity: true)
+                        slider("Opacity", value: $model.opacity, range: 0...1, suffix: "")
+                    }
+
+                    section("Inactive border") {
+                        Toggle("Enable", isOn: $model.drawInactive)
+                        VStack(alignment: .leading, spacing: 8) {
+                            ColorPicker("Color", selection: $model.inactiveColor, supportsOpacity: true)
+                            slider("Opacity", value: $model.inactiveOpacity, range: 0...1, suffix: "")
+                            Toggle("Show on hidden windows", isOn: $model.drawHiddenWindows)
+                        }
+                        .disabled(!model.drawInactive)
                     }
 
                     section("Size & shape") {
@@ -169,7 +185,6 @@ struct SettingsView: View {
                     }
 
                     section("Style") {
-                        slider("Opacity", value: $model.opacity, range: 0...1, suffix: "")
                         Toggle("Dashed", isOn: $model.dashed)
                         Toggle("Glow", isOn: $model.glow)
                         slider("Glow radius", value: $model.glowRadius, range: 0...20, suffix: "pt")

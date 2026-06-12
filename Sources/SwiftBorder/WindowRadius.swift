@@ -61,9 +61,15 @@ enum WindowRadius {
     // The window's corner radius in points, or nil if it can't be determined.
     static func cornerRadius(of window: AXUIElement) -> Double? {
         guard let s = syms else { return nil }
-
         var wid: UInt32 = 0
         guard s.axGetWindow(window, &wid) == 0, wid != 0 else { return nil }
+        return cornerRadius(ofWindowID: wid)
+    }
+
+    // Same query straight from a CGWindowID — used for inactive windows, which
+    // are enumerated from CGWindowList and have no AXUIElement handle.
+    static func cornerRadius(ofWindowID wid: CGWindowID) -> Double? {
+        guard let s = syms, wid != 0 else { return nil }
 
         let cid = s.mainConnID()
         var widValue = Int32(bitPattern: wid)
