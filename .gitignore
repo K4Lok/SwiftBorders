@@ -2,3 +2,9 @@
 .swiftpm/
 .DS_Store
 *.xcodeproj
+
+# Packaging build artifacts
+dist/
+Packaging/icon-1024.png
+Packaging/AppIcon.iconset/
+Packaging/signing/

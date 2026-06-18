@@ -38,6 +38,33 @@ On first launch macOS will ask for **Accessibility** permission: System Settings
 
 A dashed-rectangle icon appears in the menu bar — click it for settings.
 
+## Packaging & distribution
+
+SwiftBorder reads other apps' windows via the Accessibility API and a private
+`SkyLight` call, so it **cannot ship on the Mac App Store** (which requires the
+sandbox). It's distributed directly, signed with a **Developer ID** certificate
+and **notarized** — the same path JankyBorders, Rectangle, and BetterDisplay use.
+
+```bash
+./build-app.sh     # compiles release, assembles dist/SwiftBorder.app, code-signs
+./notarize.sh      # notarizes + staples the app, then builds + notarizes the DMG
+```
+
+This produces `dist/SwiftBorder.dmg` (drag-to-Applications installer) and
+`dist/SwiftBorder.zip`. See [RELEASE.md](RELEASE.md) for the full checklist.
+
+`build-app.sh` auto-detects your *Developer ID Application* certificate. One-time
+setup before notarizing — store credentials in the keychain (see the header of
+`notarize.sh` for details):
+
+```bash
+xcrun notarytool store-credentials "SwiftBorder-Notary" \
+    --apple-id "you@example.com" --team-id "YOURTEAMID" \
+    --password "app-specific-password"
+```
+
+The icon is generated from `Packaging/make-icon.swift` → `Packaging/AppIcon.icns`.
+
 ## Configuration
 
 Settings live at `~/Library/Application Support/SwiftBorder/config.json` and reload live. Colors use JankyBorders-style `0xAARRGGBB` hex.
