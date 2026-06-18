@@ -88,6 +88,22 @@ Settings live at `~/Library/Application Support/SwiftBorder/config.json` and rel
 - The exact corner radius comes from a guarded private `SkyLight` call. For native windows this is pixel-perfect; some custom-drawn apps (e.g. Telegram) render a slightly larger *visible* corner than the OS reports, so the border can sit a few points tight on those — the same limitation JankyBorders has. Fullscreen windows are squared automatically.
 - Borders track focus with a few frames of latency on fast drags (inherent to the Accessibility API).
 
+## Troubleshooting
+
+**No border appears, and the Accessibility toggle already looks ON.**
+macOS ties an Accessibility grant to the app's *code signature*. If a build with a
+different signature (e.g. a local unsigned build, or a re-signed release) was
+granted earlier, the toggle stays on but the grant no longer matches — so the app
+is silently denied. Click the menu-bar icon and press **Reset & re-grant** (shown
+in the warning banner when access is missing), then grant again. The equivalent
+from the terminal is:
+
+```bash
+tccutil reset Accessibility com.swiftborder.app
+```
+
+Then relaunch and grant once. Borders appear immediately — no restart needed.
+
 ## Debugging
 
 Run with `SWIFTBORDER_DEBUG=1 swift run` to print focus/render/display diagnostics to stderr.

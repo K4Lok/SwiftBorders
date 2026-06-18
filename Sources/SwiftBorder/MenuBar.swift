@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import QuartzCore
+import Combine
 
 // Observable mirror of BorderConfig for SwiftUI bindings. Any edit commits the
 // whole config back through `onCommit`. `load(_:)` updates the controls from an
@@ -238,12 +239,17 @@ private struct VisualEffectBackground: NSViewRepresentable {
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     let configURL: URL
+    @State private var trusted = Accessibility.isTrusted
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("SwiftBorder")
                 .font(.headline)
                 .padding(.bottom, 2)
+
+            if !trusted {
+                accessibilityBanner
+            }
 
             PreviewSwatch(model: model)
 
@@ -335,6 +341,32 @@ struct SettingsView: View {
         .frame(width: 300)
         .background(VisualEffectBackground())
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            trusted = Accessibility.isTrusted
+        }
+    }
+
+    // Shown only while Accessibility access is missing. Auto-hides the instant the
+    // grant lands (the timer above flips `trusted`).
+    private var accessibilityBanner: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Accessibility access needed", systemImage: "exclamationmark.triangle.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.orange)
+            Text("SwiftBorder can't draw borders until you grant Accessibility access. If the toggle already looks on, use Reset to clear a stale entry, then grant again.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Open Settings") { Accessibility.openSettings() }
+                Button("Reset & re-grant") { Accessibility.resetAndReprompt() }
+            }
+            .controlSize(.small)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     // Scroll-area height, capped so the whole popover sits below the menu bar.
@@ -393,6 +425,7 @@ final class MenuBarController: NSObject {
     private let configURL: URL
     private var panel: NSPanel?
     private var outsideClickMonitor: Any?
+    private var trustTimer: Timer?
 
     init(store: ConfigStore) {
         model = SettingsModel(config: store.config)
@@ -402,12 +435,34 @@ final class MenuBarController: NSObject {
         model.onCommit = { [weak store] config in store?.commitFromUI(config) }
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "rectangle.dashed",
-                                   accessibilityDescription: "SwiftBorder")
-                ?? NSImage(systemSymbolName: "rectangle", accessibilityDescription: "SwiftBorder")
             button.imagePosition = .imageOnly
             button.action = #selector(toggle)
             button.target = self
+        }
+        refreshStatusIcon()
+        // Reflect Accessibility state in the icon until it's granted, so a user
+        // who denied (and sees no border) has a visible signal to click.
+        trustTimer = Timer(timeInterval: 1.0, repeats: true) { [weak self] t in
+            guard let self else { t.invalidate(); return }
+            self.refreshStatusIcon()
+            if Accessibility.isTrusted { t.invalidate() }
+        }
+        if let trustTimer { RunLoop.main.add(trustTimer, forMode: .common) }
+    }
+
+    // Default border glyph when trusted; a warning glyph + tooltip when not.
+    private func refreshStatusIcon() {
+        guard let button = statusItem.button else { return }
+        if Accessibility.isTrusted {
+            button.image = NSImage(systemSymbolName: "rectangle.dashed",
+                                   accessibilityDescription: "SwiftBorder")
+                ?? NSImage(systemSymbolName: "rectangle", accessibilityDescription: "SwiftBorder")
+            button.toolTip = "SwiftBorder"
+        } else {
+            button.image = NSImage(systemSymbolName: "exclamationmark.triangle",
+                                   accessibilityDescription: "SwiftBorder — Accessibility access needed")
+                ?? NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: "SwiftBorder")
+            button.toolTip = "SwiftBorder needs Accessibility access — click to fix"
         }
     }
 

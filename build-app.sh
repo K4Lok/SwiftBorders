@@ -11,8 +11,8 @@ set -euo pipefail
 
 APP_NAME="SwiftBorder"
 BUNDLE_ID="com.swiftborder.app"
-VERSION="1.0.0"
-BUILD="1"
+VERSION="1.0.1"
+BUILD="2"
 MIN_OS="13.0"
 COPYRIGHT="© 2026 Ka Lok Sam"
 

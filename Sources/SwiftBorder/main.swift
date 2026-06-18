@@ -22,8 +22,7 @@ store.onExternalEdit = { config in
 FileHandle.standardError.write(Data("SwiftBorder config: \(store.path)\n".utf8))
 
 func ensureAccessibilityThenStart() {
-    let prompt = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-    if AXIsProcessTrustedWithOptions(prompt) {
+    if Accessibility.promptIfNeeded() {
         controller.start(config: store.config)
         return
     }
@@ -32,12 +31,14 @@ func ensureAccessibilityThenStart() {
     SwiftBorder needs Accessibility permission.
     Grant it in System Settings ▸ Privacy & Security ▸ Accessibility,
     then this process will start automatically. Waiting…
+    (If the toggle already looks on, click the menu-bar icon and use
+     "Reset & re-grant" to clear a stale permission entry.)
 
     """.utf8))
 
     // Poll until the user grants permission, then start.
     let timer = Timer(timeInterval: 1.0, repeats: true) { t in
-        if AXIsProcessTrusted() {
+        if Accessibility.isTrusted {
             t.invalidate()
             controller.start(config: store.config)
         }
